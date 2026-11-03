@@ -15,12 +15,27 @@ optprob = OptimizationProblem(optf, x0)
 
 plprob = ProfileLikelihoodProblem(optprob, x0; profile_lower = -5., profile_upper = 5., threshold = 1.0)
 
-for method in [
+@everywhere struct BufferedRosenbrock
+  buffer::Vector{Any}
+end
+
+@everywhere function (rosen::BufferedRosenbrock)(x, p)
+  for i in eachindex(x)
+    rosen.buffer[i] = x[i]
+  end
+  return (1.0 - rosen.buffer[1])^2 + 100.0*(rosen.buffer[2] - rosen.buffer[1]^2)^2
+end
+
+buffered_optf = OptimizationFunction(BufferedRosenbrock(Vector{Any}(undef, 2)), AutoForwardDiff())
+buffered_plprob = ProfileLikelihoodProblem(OptimizationProblem(buffered_optf, x0), x0;
+  profile_lower = -5., profile_upper = 5., threshold = 1.0)
+
+for plprob in [plprob, buffered_plprob], method in [
   IntegrationProfiler(integrator = Tsit5()),
   OptimizationProfiler(optimizer = LBFGSB(), stepper = FixedStep(; initial_step=0.1)),
   CICOProfiler(scan_tol = 1e-4)
 ]
-  
+
 
   @time sol_serial = solve(plprob, method)
   @time sol_threads = solve(plprob, method, parallel_type=:threads)

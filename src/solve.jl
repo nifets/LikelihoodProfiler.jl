@@ -101,7 +101,8 @@ function __solve_parallel(plprob::ProfileLikelihoodProblem, method::AbstractProf
   elapsed_time = @elapsed begin 
     profile_data = Vector{Any}(undef, length(II))
     Base.Threads.@threads for i in 1:length(II)
-      profile_data[i] = solve(plprob, method, II[i]..., args...; kwargs...)
+      local_plprob = remake(plprob; optprob = deepcopy(plprob.optprob))
+      profile_data[i] = solve(local_plprob, method, II[i]..., args...; kwargs...)
     end
   end
   
