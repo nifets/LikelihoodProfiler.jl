@@ -86,15 +86,7 @@ function build_optf_reduced(optprob::OptimizationProblem, optpars)
     end
   end
 
-  #TODO add hessprod, hess_prototype, etc
-  
-  kwargs = Dict{Symbol,Any}()
-  for p in propertynames(optf_full)
-    if p ∉ (:f, :adtype, :grad, :hess)
-      kwargs[p] = getfield(optf_full, p)
-    end
-  end
-  return OptimizationFunction(f_reduced, optf_full.adtype; grad=grad_reduced!, hess=hess_reduced!, kwargs...)
+  return OptimizationFunction(f_reduced, optf_full.adtype; grad=grad_reduced!, hess=hess_reduced!)
 end
 
 

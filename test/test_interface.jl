@@ -224,3 +224,28 @@ end
     @test_throws DimensionMismatch ProfileLikelihoodProblem(optprob, [0.0, 0.0, 0.0], [g1,g2];
         profile_lower=[-1.0], profile_upper=[1.0, 1.0])
 end
+
+# ----------------------------
+# Reduced OptimizationFunction
+# ----------------------------
+@testset "Reduced optf drops full-length fields" begin
+    using ForwardDiff
+    OptimizationBase = LikelihoodProfiler.Optimization.OptimizationBase
+
+    obj(x, p) = (1.0 - x[1])^2 + 100.0*(x[2] - x[1]^2)^2 + (x[3] - 1.0)^2
+    fg(G, x, p) = (G .= ForwardDiff.gradient(y -> obj(y, p), x); obj(x, p))
+    hv(Hv, x, v, p) = (Hv .= ForwardDiff.hessian(y -> obj(y, p), x) * v)
+
+    x0 = [1.0, 1.0, 1.0]
+    optf = OptimizationFunction(obj, AutoForwardDiff(); fg, hv)
+    optprob_reduced = LikelihoodProfiler.build_optprob_reduced(OptimizationProblem(optf, x0), x0, 1)
+    optf_reduced = OptimizationBase.instantiate_function(optprob_reduced.f, optprob_reduced.u0,
+        optprob_reduced.f.adtype, optprob_reduced.p; g=true, fg=true, hv=true)
+
+    G = zeros(2)
+    Hv = zeros(2)
+    @test optf_reduced.fg(G, optprob_reduced.u0) ≈ obj(x0, nothing)
+    @test G ≈ ForwardDiff.gradient(x -> obj(x, nothing), x0)[2:3]
+    optf_reduced.hv(Hv, optprob_reduced.u0, ones(2))
+    @test Hv ≈ ForwardDiff.hessian(x -> obj(x, nothing), x0)[2:3, 2:3] * ones(2)
+end
