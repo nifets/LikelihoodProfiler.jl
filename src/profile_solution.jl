@@ -247,6 +247,16 @@ profile_labels(sol::ProfileLikelihoodSolution) = profile_labels(sol.prob)
 endpoints(sol::ProfileLikelihoodSolution; kwargs...) = endpoints.(sol.profiles; kwargs...)
 retcodes(sol::ProfileLikelihoodSolution) = retcodes.(sol.profiles)
 
+function best_profile_point(sol::ProfileLikelihoodSolution)
+  pars_best, obj_best = nothing, Inf
+  for profile in sol.profiles, (pars, obj) in zip(profile.pars, profile.obj)
+    if obj < obj_best
+      pars_best, obj_best = pars, obj
+    end
+  end
+  return pars_best, obj_best
+end
+
 function build_profile_solution(plprob::ProfileLikelihoodProblem,
                                 branches::AbstractVector,
                                 elapsed_time::Real)

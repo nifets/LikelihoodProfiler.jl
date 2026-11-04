@@ -33,10 +33,13 @@ sol = solve(plprob, method)
 ```
 """
 function SciMLBase.solve(plprob::ProfileLikelihoodProblem, method::AbstractProfilerMethod; 
-  reoptimize_init::Bool=false, parallel_type::Symbol=:none, verbose::Bool=false, kwargs...)
+  reoptimize_init::Bool=false, max_recenters::Integer=0, recenter_tol::Real=1e-3,
+  parallel_type::Symbol=:none, verbose::Bool=false, kwargs...)
 
   check_prob_alg(plprob, method)
-  
+  max_recenters > 0 && !hasoptimizer(method) &&
+    throw(ArgumentError("`method` must have a valid `optimizer` provided when `max_recenters > 0`."))
+
   θ₀= plprob.optpars
   T = float(eltype(θ₀))
 
@@ -59,8 +62,20 @@ function SciMLBase.solve(plprob::ProfileLikelihoodProblem, method::AbstractProfi
 
   verbose && @info "Computing initial values."
   obj0 = evaluate_obj(_plprob, _plprob.optpars)
+  sol = __solve(_plprob, method; obj0=T(obj0), parallel_type, verbose, kwargs...)
 
-  return __solve(_plprob, method; obj0=T(obj0), parallel_type, verbose, kwargs...)
+  for _ in 1:max_recenters
+    pars_best, obj_best = best_profile_point(sol)
+    obj_best < obj0 - recenter_tol || break
+    @warn "Profile found objective $obj_best below the optimum $obj0. Re-optimizing and recomputing profiles."
+
+    s = solve(remake(_plprob.optprob; u0=pars_best), get_optimizer(method); get_optimizer_opts(method)...)
+    optpars_new = copyto!(similar(_plprob.optpars, T), SciMLBase.successful_retcode(s) ? s.u : pars_best)
+    _plprob = remake(_plprob; optpars=optpars_new)
+    obj0 = evaluate_obj(_plprob, _plprob.optpars)
+    sol = __solve(_plprob, method; obj0=T(obj0), parallel_type, verbose, kwargs...)
+  end
+  return sol
 end
 
 """
