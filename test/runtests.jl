@@ -8,6 +8,10 @@ end
   include("test_analytic_funcs.jl")
 end
 
+@testset "Profile recentering" begin
+  include("test_recenter.jl")
+end
+
 @testset "Parallel profiling" begin
   include("test_parallel.jl")
 end
